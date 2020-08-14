@@ -1,7 +1,7 @@
 '''
-Desc:
+Desc:这是一个单层的rnn神经网络对文本数据进行二分类情感处理，主要分为积极和消极
 Author:SQY
-Date:2020-8-4
+Date:2020-8-10
 '''
 import tensorflow as tf
 import pandas as pd
@@ -16,7 +16,7 @@ os.environ['TP_CPP_MIN_LOG_LEVEL'] = '2'
 assert tf.__version__.startswith('2.')
 
 #定义参数
-num_words = 10000 #在文本中，常见的词在一万左右，剩下不常见的我们基本用不到，此地将不常见的词均用10000表示
+num_words = 35000 #在文本中，常见的词在一万左右，剩下不常见的我们基本用不到，此地将不常见的词均用10000表示
 max_len = 80 #设置每个句子的长度
 batch_size = 128#每批次训练多少
 embedding_dim = 100#词向量的维度
@@ -45,21 +45,21 @@ def split_data():
     db_test = db_test.shuffle(1000).batch(batch_size = batch_size,drop_remainder=True)
     print(x_train.shape,tf.reduce_min(y_train),tf.reduce_max(y_train))
     print(x_test.shape)
-    return db_train,db_test
+    return db_train,db_test,x_train,x_test
 class MyRnn(keras.Model):
     def __init__(self,units):
         super(MyRnn, self).__init__()
         #设定初始状态
         self.state0 = [tf.zeros([batch_size,units])]
         self.embedding = layers.Embedding(num_words,embedding_dim,input_length=max_len)
-        self.rnncell0 = layers.SimpleRNNCell(units,dropout=0.02)
+        self.rnncell0 = layers.SimpleRNNCell(units,dropout=0.3)
         self.outlayer = layers.Dense(1)
     def call(self, inputs, training=None):
         x = inputs
         x = self.embedding(x)
         state0 = self.state0
         for word in tf.unstack(x,axis=1):
-            output,state1 = self.rnncell0(word,state0)
+            output,state1 = self.rnncell0(word,state0,training)
             state0 = state1
         x = self.outlayer(output)
         prob = tf.sigmoid(x)
@@ -68,10 +68,12 @@ def main():
     units = 64
     model = MyRnn(units)
     model.compile(optimizer=tf.optimizers.Adam(0.002),
-                  loss = tf.losses.categorical_crossentropy,
+                  loss = tf.losses.binary_crossentropy,
                   metrics=["accuracy"])
-    db_train,db_test= split_data()
-    model.fit(db_train,epochs=2)
-    model.evaluate(db_test)
+    db_train,db_test,x_train,x_test= split_data()
+    model.fit(db_train,epochs=10)
+    print('eva:',model.evaluate(db_test))
+    # pre = model.predict(x_test)
+    # print('pre:',pre)
 if __name__ == '__main__':
     main()
